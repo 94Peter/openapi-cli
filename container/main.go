@@ -36,6 +36,7 @@ func main() {
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
 		cmd.NewMergeCmd(),
+		cmd.NewToGwSettingCmd(),
 	}
 	err := app.Run(os.Args)
 

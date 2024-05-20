@@ -149,6 +149,9 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 			m.doc.AddOperation(k, method, o)
 		}
 
+		if mergeDoc.Components == nil {
+			continue
+		}
 		for k, v := range mergeDoc.Components.Schemas {
 			if m.doc.Components.Schemas == nil {
 				m.doc.Components.Schemas = make(openapi3.Schemas)

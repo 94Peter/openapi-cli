@@ -4,7 +4,7 @@ LDFLAGS=-ldflags "-X main.Version=${V} -X main.BuildTime=${BUILD_TIME}"
 NAME=openapi-cli
 
 run: build
-	./bin/$(NAME)
+	./bin/$(NAME) ${PARAMS}
 
 build: clear
 	go build ${LDFLAGS} -o ./bin/$(NAME) ./container/main.go
@@ -12,3 +12,11 @@ build: clear
 
 clear:
 	rm -rf ./bin/$(NAME)
+
+build-docker:
+	docker build --build-arg SERVICE=$(NAME) -t 94peter/$(NAME):dev .
+	docker rmi $$(docker images --filter "dangling=true" -q --no-trunc)
+
+push-docker:
+	docker tag 94peter/${NAME}:dev  94peter/${NAME}:$(V)
+	docker push 94peter/${NAME}:$(V)
