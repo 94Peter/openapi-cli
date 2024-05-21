@@ -90,11 +90,16 @@ func (c *toGwSettingCmd) Run() error {
 }
 
 type apiDefinition struct {
-	Description string   `json:"description"`
-	Endpoint    string   `json:"endpoint"`
-	Method      string   `json:"method"`
-	Backend     string   `json:"backend"`
-	Host        []string `json:"host"`
+	Description  string   `json:"description"`
+	Endpoint     string   `json:"endpoint"`
+	Method       string   `json:"method"`
+	Backend      string   `json:"backend"`
+	Host         []string `json:"host"`
+	InputQueries []string `json:"input_querys,omitempty"`
+}
+
+func (a *apiDefinition) AddInputQueryString(query string) {
+	a.InputQueries = append(a.InputQueries, query)
 }
 
 func newApiDefinition(method string, path string, operation *openapi3.Operation) *apiDefinition {
@@ -102,11 +107,17 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation)
 	for i, tag := range operation.Tags {
 		tags[i] = fmt.Sprintf("#SERVICE_%s", strings.ToUpper(tag))
 	}
-	return &apiDefinition{
-		Description: operation.Description,
+	apiDefinition := &apiDefinition{
+		Description: operation.Summary,
 		Endpoint:    path,
 		Method:      method,
 		Backend:     path,
 		Host:        tags,
 	}
+	for _, param := range operation.Parameters {
+		if param.Value.In == "query" {
+			apiDefinition.AddInputQueryString(param.Value.Name)
+		}
+	}
+	return apiDefinition
 }
