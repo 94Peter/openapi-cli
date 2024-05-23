@@ -20,3 +20,7 @@ build-docker:
 push-docker:
 	docker tag 94peter/${NAME}:dev  94peter/${NAME}:$(V)
 	docker push 94peter/${NAME}:$(V)
+
+install-cmd: build
+	sudo mv ./bin/$(NAME) /usr/local/bin/
+	$(NAME)
