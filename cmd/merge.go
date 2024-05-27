@@ -145,7 +145,7 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 				}
 				o.Security = requirements
 			}
-			o.Tags = []string{mergeDoc.Info.Title}
+			o.Tags = append([]string{mergeDoc.Info.Title}, o.Tags...)
 			m.doc.AddOperation(k, method, o)
 		}
 

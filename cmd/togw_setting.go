@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/pkg/errors"
@@ -63,10 +62,14 @@ func (c *toGwSettingCmd) Run() error {
 	}
 
 	var apiDefinitions []*apiDefinition
+	serviceMap := map[string]string{}
+	for _, s := range mainSpec.Servers {
+		serviceMap[s.Description] = s.URL
+	}
 
 	for path, pathItem := range mainSpec.Paths.Map() {
 		for method, op := range pathItem.Operations() {
-			apiDefinitions = append(apiDefinitions, newApiDefinition(method, path, op))
+			apiDefinitions = append(apiDefinitions, newApiDefinition(method, path, op, serviceMap))
 		}
 	}
 	// Create the output JSON file
@@ -97,16 +100,19 @@ type apiDefinition struct {
 	Host        []string `json:"host"`
 }
 
-func newApiDefinition(method string, path string, operation *openapi3.Operation) *apiDefinition {
-	tags := make([]string, len(operation.Tags))
-	for i, tag := range operation.Tags {
-		tags[i] = fmt.Sprintf("#SERVICE_%s", strings.ToUpper(tag))
+func newApiDefinition(method string, path string, operation *openapi3.Operation, serviceMap map[string]string) *apiDefinition {
+	var host []string
+
+	if url, ok := serviceMap[operation.Tags[0]]; ok {
+		host = []string{"http://" + url}
+	} else {
+		host = []string{fmt.Sprintf("#%s", operation.Tags[0])}
 	}
 	return &apiDefinition{
 		Description: operation.Description,
 		Endpoint:    path,
 		Method:      method,
 		Backend:     path,
-		Host:        tags,
+		Host:        host,
 	}
 }
