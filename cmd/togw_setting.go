@@ -104,7 +104,7 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation,
 	var host []string
 
 	if url, ok := serviceMap[operation.Tags[0]]; ok {
-		host = []string{"http://" + url}
+		host = []string{url}
 	} else {
 		host = []string{fmt.Sprintf("#%s", operation.Tags[0])}
 	}
