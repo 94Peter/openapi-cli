@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/pkg/errors"
@@ -25,6 +26,10 @@ func NewToGwSettingCmd() cli.Command {
 				Name:  "output",
 				Usage: "輸出檔案路徑",
 			},
+			cli.StringFlag{
+				Name:  "version-replace",
+				Usage: "替換版本號",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			mainFile := c.String("spec")
@@ -35,24 +40,29 @@ func NewToGwSettingCmd() cli.Command {
 			if outputFile == "" {
 				return errors.New("no output file")
 			}
+
+			versionReplace := c.String("version-replace")
 			return newToGwSettingCmd(
 				mainFile,
 				outputFile,
+				versionReplace,
 			).Run()
 		},
 	}
 }
 
-func newToGwSettingCmd(spec string, outputFile string) *toGwSettingCmd {
+func newToGwSettingCmd(spec string, outputFile string, versionreplace string) *toGwSettingCmd {
 	return &toGwSettingCmd{
-		spec:       spec,
-		outputFile: outputFile,
+		spec:           spec,
+		outputFile:     outputFile,
+		versionReplace: versionreplace,
 	}
 }
 
 type toGwSettingCmd struct {
-	spec       string
-	outputFile string
+	spec           string
+	outputFile     string
+	versionReplace string
 }
 
 func (c *toGwSettingCmd) Run() error {
@@ -69,7 +79,8 @@ func (c *toGwSettingCmd) Run() error {
 
 	for path, pathItem := range mainSpec.Paths.Map() {
 		for method, op := range pathItem.Operations() {
-			apiDefinitions = append(apiDefinitions, newApiDefinition(method, path, op, serviceMap))
+			apiDefinitions = append(apiDefinitions,
+				newApiDefinition(method, path, op, serviceMap, c.versionReplace))
 		}
 	}
 	// Create the output JSON file
@@ -105,7 +116,9 @@ func (a *apiDefinition) AddInputQueryString(query string) {
 	a.InputQueries = append(a.InputQueries, query)
 }
 
-func newApiDefinition(method string, path string, operation *openapi3.Operation, serviceMap map[string]string) *apiDefinition {
+var versionReplaceReg = regexp.MustCompile(`/v[0-9]+`)
+
+func newApiDefinition(method string, path string, operation *openapi3.Operation, serviceMap map[string]string, replaceVersion string) *apiDefinition {
 	var host []string
 
 	if url, ok := serviceMap[operation.Tags[0]]; ok {
@@ -113,9 +126,15 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation,
 	} else {
 		host = []string{fmt.Sprintf("#%s", operation.Tags[0])}
 	}
+	var endpoint string
+	if replaceVersion != "" {
+		endpoint = versionReplaceReg.ReplaceAllString(path, "/"+replaceVersion)
+	} else {
+		endpoint = path
+	}
 	apiDefinition := &apiDefinition{
 		Description: operation.Summary,
-		Endpoint:    path,
+		Endpoint:    endpoint,
 		Method:      method,
 		Backend:     path,
 		Host:        host,
