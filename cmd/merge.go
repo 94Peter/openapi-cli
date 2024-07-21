@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -26,6 +27,10 @@ func NewMergeCmd() cli.Command {
 			cli.StringFlag{
 				Name:  "output",
 				Usage: "輸出檔案路徑",
+			},
+			cli.StringFlag{
+				Name:  "version-replace",
+				Usage: "替換版本號",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -57,23 +62,26 @@ func NewMergeCmd() cli.Command {
 				mainFile,
 				mergeFiles,
 				outputFile,
+				c.String("version-replace"),
 			).Run()
 		},
 	}
 }
 
-func newMergeCmd(mainFile string, mergeFiles []string, outputFile string) *mergeCmd {
+func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, replaceVers string) *mergeCmd {
 	return &mergeCmd{
-		mainFile:   mainFile,
-		mergeFiles: mergeFiles,
-		outputFile: outputFile,
+		mainFile:    mainFile,
+		mergeFiles:  mergeFiles,
+		outputFile:  outputFile,
+		replaceVers: replaceVers,
 	}
 }
 
 type mergeCmd struct {
-	mainFile   string
-	mergeFiles []string
-	outputFile string
+	mainFile    string
+	mergeFiles  []string
+	outputFile  string
+	replaceVers string
 }
 
 func (c *mergeCmd) Run() error {
@@ -81,7 +89,7 @@ func (c *mergeCmd) Run() error {
 	if err != nil {
 		return errors.Wrap(err, "load main spec fail")
 	}
-	tool := newMergeTool(mainSpec)
+	tool := newMergeTool(mainSpec, c.replaceVers)
 	for _, file := range c.mergeFiles {
 		spec2, err := openapi3.NewLoader().LoadFromFile(file)
 		if err != nil {
@@ -95,14 +103,16 @@ func (c *mergeCmd) Run() error {
 	return tool.OuputYaml(c.outputFile)
 }
 
-func newMergeTool(maindoc *openapi3.T) *mergeTool {
+func newMergeTool(maindoc *openapi3.T, replaceVers string) *mergeTool {
 	return &mergeTool{
-		doc: maindoc,
+		doc:            maindoc,
+		replaceVersion: replaceVers,
 	}
 }
 
 type mergeTool struct {
-	doc *openapi3.T
+	doc            *openapi3.T
+	replaceVersion string
 }
 
 func (mt *mergeTool) OuputYaml(file string) error {
@@ -146,6 +156,11 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 				o.Security = requirements
 			}
 			o.Tags = append([]string{mergeDoc.Info.Title}, o.Tags...)
+
+			if m.replaceVersion != "" {
+				k = versionReplaceReg.ReplaceAllString(k, "/"+m.replaceVersion)
+			}
+			fmt.Println(k)
 			m.doc.AddOperation(k, method, o)
 		}
 
