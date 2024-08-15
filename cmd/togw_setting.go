@@ -72,15 +72,11 @@ func (c *toGwSettingCmd) Run() error {
 	}
 
 	var apiDefinitions []*apiDefinition
-	serviceMap := map[string]string{}
-	for _, s := range mainSpec.Servers {
-		serviceMap[s.Description] = s.URL
-	}
 
 	for path, pathItem := range mainSpec.Paths.Map() {
 		for method, op := range pathItem.Operations() {
 			apiDefinitions = append(apiDefinitions,
-				newApiDefinition(method, path, op, serviceMap, c.versionReplace))
+				newApiDefinition(method, path, op, c.versionReplace))
 		}
 	}
 	// Create the output JSON file
@@ -118,14 +114,8 @@ func (a *apiDefinition) AddInputQueryString(query string) {
 
 var versionReplaceReg = regexp.MustCompile(`/v[0-9]+`)
 
-func newApiDefinition(method string, path string, operation *openapi3.Operation, serviceMap map[string]string, replaceVersion string) *apiDefinition {
-	var host []string
-
-	if url, ok := serviceMap[operation.Tags[0]]; ok {
-		host = []string{url}
-	} else {
-		host = []string{fmt.Sprintf("#%s", operation.Tags[0])}
-	}
+func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string) *apiDefinition {
+	host := []string{operation.ExternalDocs.URL}
 	var endpoint string
 	if replaceVersion != "" {
 		endpoint = versionReplaceReg.ReplaceAllString(path, "/"+replaceVersion)

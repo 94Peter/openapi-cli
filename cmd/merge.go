@@ -145,6 +145,11 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 		Name:        mergeDoc.Info.Title,
 		Description: mergeDoc.Info.Description,
 	})
+	if len(mergeDoc.Servers) == 0 {
+		return errors.New(mergeDoc.Info.Title + " has no server")
+	}
+	url := mergeDoc.Servers[0].URL
+	desc := mergeDoc.Servers[0].Description
 	// merge all mergeDoc to mainDoc
 	for k, v := range mergeDoc.Paths.Map() {
 		for method, o := range v.Operations() {
@@ -155,12 +160,12 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 				}
 				o.Security = requirements
 			}
-			o.Tags = append([]string{mergeDoc.Info.Title}, o.Tags...)
 
 			if m.replaceVersion != "" {
+				o.Summary = o.Summary + fmt.Sprintf("(對應 %s %s)", method, k)
 				k = versionReplaceReg.ReplaceAllString(k, "/"+m.replaceVersion)
 			}
-			fmt.Println(k)
+			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: url}
 			m.doc.AddOperation(k, method, o)
 		}
 
