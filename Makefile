@@ -8,7 +8,6 @@ run: build
 
 build: clear
 	go build ${LDFLAGS} -o ./bin/$(NAME) ./container/main.go
-	./bin/$(NAME) -v
 
 clear:
 	rm -rf ./bin/$(NAME)

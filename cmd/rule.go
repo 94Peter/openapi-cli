@@ -150,14 +150,14 @@ func newRules(servers openapi3.Servers, method string, path string, op *openapi3
 				{Handler: "json", Config: []byte("{}")},
 			},
 		}
-		if op.Security == nil {
-			newRule.Authenticators = []rule.Handler{
-				{Handler: "anonymous", Config: []byte(`{"subject": "guest"}`)},
-			}
-		} else {
+		if op.Security != nil && len(*op.Security) > 0 {
 			newRule.Authenticators = []rule.Handler{
 				{Handler: "bearer_token", Config: []byte(`{}`)},
 				{Handler: "unauthorized"},
+			}
+		} else {
+			newRule.Authenticators = []rule.Handler{
+				{Handler: "anonymous", Config: []byte(`{"subject": "guest"}`)},
 			}
 		}
 		result[i] = newRule
@@ -194,7 +194,7 @@ func newMatch(server *openapi3.Server, method string, url string, op *openapi3.O
 			}
 
 			format := param.Value.Schema.Value.Format
-			fmt.Println(format)
+
 			if replace, ok := formatReplaceMap[format]; ok {
 				url = strings.ReplaceAll(url, match[0], replace)
 				continue

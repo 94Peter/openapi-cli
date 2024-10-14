@@ -153,7 +153,7 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 	// merge all mergeDoc to mainDoc
 	for k, v := range mergeDoc.Paths.Map() {
 		for method, o := range v.Operations() {
-			if o.Security != nil {
+			if o.Security != nil && len(*o.Security) != 0 {
 				requirements := openapi3.NewSecurityRequirements()
 				for k := range m.doc.Components.SecuritySchemes {
 					requirements.With(openapi3.NewSecurityRequirement().Authenticate(k))
