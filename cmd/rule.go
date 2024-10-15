@@ -167,14 +167,13 @@ func newRules(servers openapi3.Servers, method string, path string, op *openapi3
 }
 
 var re = regexp.MustCompile(`\{([^}]+)\}`)
-var schemaReplace = regexp.MustCompile(`^(http|https)`)
+var schemaReplace = regexp.MustCompile(`^(https|http)`)
 
 const replaceSchemaStr = `<https|http>`
 
 func replaceSchema(url string) string {
 	// Replace the match with the replacement string
-	s := schemaReplace.ReplaceAllString(url, replaceSchemaStr)
-	return s
+	return schemaReplace.ReplaceAllString(url, replaceSchemaStr)
 
 }
 
