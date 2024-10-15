@@ -152,6 +152,7 @@ func newRules(servers openapi3.Servers, method string, path string, op *openapi3
 		}
 		if op.Security != nil && len(*op.Security) > 0 {
 			newRule.Authenticators = []rule.Handler{
+				{Handler: "cookie_session", Config: []byte(`{}`)},
 				{Handler: "bearer_token", Config: []byte(`{}`)},
 				{Handler: "unauthorized"},
 			}
