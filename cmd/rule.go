@@ -199,7 +199,7 @@ func newMatch(server *openapi3.Server, method string, url string, op *openapi3.O
 				url = strings.ReplaceAll(url, match[0], replace)
 				continue
 			}
-			url = strings.ReplaceAll(url, match[1], "<.*>")
+			url = strings.ReplaceAll(url, match[0], "<.*>")
 		}
 
 	}
@@ -216,5 +216,6 @@ var formatReplaceMap = map[string]string{
 }
 
 var typeReplaceMap = map[string]string{
-	"int": "<[[:digit:]]+>",
+	"int":     "<[[:digit:]]+>",
+	"integer": "<[[:digit:]]+>",
 }
