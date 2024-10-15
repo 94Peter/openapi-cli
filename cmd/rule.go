@@ -167,13 +167,23 @@ func newRules(servers openapi3.Servers, method string, path string, op *openapi3
 }
 
 var re = regexp.MustCompile(`\{([^}]+)\}`)
+var schemaReplace = regexp.MustCompile(`^(http|https)`)
+
+const replaceSchemaStr = `<https|http>`
+
+func replaceSchema(url string) string {
+	// Replace the match with the replacement string
+	s := schemaReplace.ReplaceAllString(url, replaceSchemaStr)
+	return s
+
+}
 
 func newMatch(server *openapi3.Server, method string, url string, op *openapi3.Operation) *rule.Match {
 	matches := re.FindAllStringSubmatch(url, -1)
 	if len(matches) == 0 {
 		return &rule.Match{
 			Methods: []string{method},
-			URL:     server.URL + url,
+			URL:     replaceSchema(server.URL) + url,
 		}
 	}
 	for _, match := range matches {
@@ -207,7 +217,7 @@ func newMatch(server *openapi3.Server, method string, url string, op *openapi3.O
 
 	return &rule.Match{
 		Methods: []string{method},
-		URL:     server.URL + url,
+		URL:     replaceSchema(server.URL) + url,
 	}
 }
 
