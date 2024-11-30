@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -70,12 +71,6 @@ func (c *oathKeeperRuleCmd) Run() error {
 	for path, pathItem := range mainSpec.Paths.Map() {
 		for method, op := range pathItem.Operations() {
 			oathkeeperRules := newRules(mainSpec.Servers, method, path, op)
-
-			// oathkeeperRule.Match = newRuleMatch(method, path)
-			// for _, p := range op.Parameters {
-			// 	p.Value.In = "path"
-			// 	p.Value.Schema.Value.Pattern = "^[a-fA-F0-9]{24}$"
-			// }
 			rules = append(rules, oathkeeperRules...)
 		}
 	}
@@ -133,56 +128,54 @@ func (c *oathKeeperRuleCmd) Run() error {
 */
 
 func newRules(servers openapi3.Servers, method string, path string, op *openapi3.Operation) []*rule.Rule {
-	result := make([]*rule.Rule, len(servers))
-	for i, server := range servers {
-		newRule := &rule.Rule{
-			ID:       fmt.Sprintf("rule-%s-%d", op.OperationID, i),
-			Match:    newMatch(server, method, path, op),
-			Upstream: rule.Upstream{},
-			Authorizer: rule.Handler{
-				Handler: "allow",
-				Config:  []byte("{}"),
-			},
-			Mutators: []rule.Handler{
-				{Handler: "header", Config: []byte("{}")},
-			},
-			Errors: []rule.ErrorHandler{
-				{Handler: "json", Config: []byte("{}")},
-			},
-		}
-		if op.Security != nil && len(*op.Security) > 0 {
-			newRule.Authenticators = []rule.Handler{
-				{Handler: "cookie_session", Config: []byte(`{}`)},
-				{Handler: "bearer_token", Config: []byte(`{}`)},
-				{Handler: "unauthorized"},
-			}
-		} else {
-			newRule.Authenticators = []rule.Handler{
-				{Handler: "anonymous", Config: []byte(`{"subject": "guest"}`)},
-			}
-		}
-		result[i] = newRule
+	newRule := &rule.Rule{
+		ID:       fmt.Sprintf("rule-%s", op.OperationID),
+		Match:    newMatch(servers, method, path, op),
+		Upstream: rule.Upstream{},
+		Authorizer: rule.Handler{
+			Handler: "allow",
+			Config:  []byte("{}"),
+		},
+		Mutators: []rule.Handler{
+			{Handler: "header", Config: []byte("{}")},
+		},
+		Errors: []rule.ErrorHandler{
+			{Handler: "json", Config: []byte("{}")},
+		},
 	}
-	return result
+	if op.Security != nil && len(*op.Security) > 0 {
+		newRule.Authenticators = []rule.Handler{
+			{Handler: "cookie_session", Config: []byte(`{}`)},
+			{Handler: "bearer_token", Config: []byte(`{}`)},
+			{Handler: "unauthorized"},
+		}
+	} else {
+		newRule.Authenticators = []rule.Handler{
+			{Handler: "anonymous", Config: []byte(`{"subject": "guest"}`)},
+		}
+	}
+	return []*rule.Rule{newRule}
 }
 
 var re = regexp.MustCompile(`\{([^}]+)\}`)
-var schemaReplace = regexp.MustCompile(`^(https|http)`)
 
-const replaceSchemaStr = `<https|http>`
+const matchUrlTpl = "<https|http>://<%s>%s"
 
-func replaceSchema(url string) string {
-	// Replace the match with the replacement string
-	return schemaReplace.ReplaceAllString(url, replaceSchemaStr)
+func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi3.Operation) *rule.Match {
+	matches := re.FindAllStringSubmatch(myurl, -1)
 
-}
-
-func newMatch(server *openapi3.Server, method string, url string, op *openapi3.Operation) *rule.Match {
-	matches := re.FindAllStringSubmatch(url, -1)
+	hostMatch := make([]string, len(servers))
+	for i, server := range servers {
+		parsed, err := url.Parse(server.URL)
+		if err != nil {
+			panic(err)
+		}
+		hostMatch[i] = parsed.Host
+	}
 	if len(matches) == 0 {
 		return &rule.Match{
 			Methods: []string{method},
-			URL:     replaceSchema(server.URL) + url,
+			URL:     fmt.Sprintf(matchUrlTpl, strings.Join(hostMatch, "|"), myurl),
 		}
 	}
 	for _, match := range matches {
@@ -195,7 +188,7 @@ func newMatch(server *openapi3.Server, method string, url string, op *openapi3.O
 			}
 			typeName := param.Value.Schema.Value.Type.Slice()[0]
 			if replace, ok := typeReplaceMap[typeName]; ok {
-				url = strings.ReplaceAll(url, match[0], replace)
+				myurl = strings.ReplaceAll(myurl, match[0], replace)
 				continue
 			}
 
@@ -206,17 +199,17 @@ func newMatch(server *openapi3.Server, method string, url string, op *openapi3.O
 			format := param.Value.Schema.Value.Format
 
 			if replace, ok := formatReplaceMap[format]; ok {
-				url = strings.ReplaceAll(url, match[0], replace)
+				myurl = strings.ReplaceAll(myurl, match[0], replace)
 				continue
 			}
-			url = strings.ReplaceAll(url, match[0], "<.*>")
+			myurl = strings.ReplaceAll(myurl, match[0], "<.*>")
 		}
 
 	}
 
 	return &rule.Match{
 		Methods: []string{method},
-		URL:     replaceSchema(server.URL) + url,
+		URL:     fmt.Sprintf(matchUrlTpl, strings.Join(hostMatch, "|"), myurl),
 	}
 }
 
