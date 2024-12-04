@@ -30,6 +30,10 @@ func NewToGwSettingCmd() cli.Command {
 				Name:  "version-replace",
 				Usage: "替換版本號",
 			},
+			cli.StringFlag{
+				Name:  "no-redirect-tag",
+				Usage: "替換版本號",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			mainFile := c.String("spec")
@@ -40,22 +44,25 @@ func NewToGwSettingCmd() cli.Command {
 			if outputFile == "" {
 				return errors.New("no output file")
 			}
+			noRedirectTag := c.String("no-redirect-tag")
 
 			versionReplace := c.String("version-replace")
 			return newToGwSettingCmd(
 				mainFile,
 				outputFile,
 				versionReplace,
+				noRedirectTag,
 			).Run()
 		},
 	}
 }
 
-func newToGwSettingCmd(spec string, outputFile string, versionreplace string) *toGwSettingCmd {
+func newToGwSettingCmd(spec string, outputFile string, versionreplace string, noRedirectTag string) *toGwSettingCmd {
 	return &toGwSettingCmd{
 		spec:           spec,
 		outputFile:     outputFile,
 		versionReplace: versionreplace,
+		noRedirectTag:  noRedirectTag,
 	}
 }
 
@@ -63,6 +70,7 @@ type toGwSettingCmd struct {
 	spec           string
 	outputFile     string
 	versionReplace string
+	noRedirectTag  string
 }
 
 func (c *toGwSettingCmd) Run() error {
@@ -72,11 +80,20 @@ func (c *toGwSettingCmd) Run() error {
 	}
 
 	var apiDefinitions []*apiDefinition
-
+	var noRedirect bool
 	for path, pathItem := range mainSpec.Paths.Map() {
 		for method, op := range pathItem.Operations() {
+			noRedirect = false
+			if c.noRedirectTag != "" {
+				for _, tag := range op.Tags {
+					if tag == c.noRedirectTag {
+						noRedirect = true
+						break
+					}
+				}
+			}
 			apiDefinitions = append(apiDefinitions,
-				newApiDefinition(method, path, op, c.versionReplace))
+				newApiDefinition(method, path, op, c.versionReplace, noRedirect))
 		}
 	}
 	// Create the output JSON file
@@ -106,6 +123,7 @@ type apiDefinition struct {
 	Backend      string   `json:"backend"`
 	Host         []string `json:"host"`
 	InputQueries []string `json:"input_querys,omitempty"`
+	NoRedirect   bool     `json:"no_redirect,omitempty"`
 }
 
 func (a *apiDefinition) AddInputQueryString(query string) {
@@ -114,7 +132,7 @@ func (a *apiDefinition) AddInputQueryString(query string) {
 
 var versionReplaceReg = regexp.MustCompile(`/v[0-9]+`)
 
-func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string) *apiDefinition {
+func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string, noRedirect bool) *apiDefinition {
 	host := []string{operation.ExternalDocs.URL}
 	var endpoint string
 	if replaceVersion != "" {
@@ -128,6 +146,7 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation,
 		Method:      method,
 		Backend:     path,
 		Host:        host,
+		NoRedirect:  noRedirect,
 	}
 	for _, param := range operation.Parameters {
 		if param.Value.In == "query" {
