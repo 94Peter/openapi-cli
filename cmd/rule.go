@@ -29,6 +29,10 @@ func NewOathKeeperRuleCmd() cli.Command {
 				Name:  "output",
 				Usage: "輸出檔案路徑",
 			},
+			cli.StringFlag{
+				Name:  "skip-tag",
+				Usage: "略過rule的標籤",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			mainFile := c.String("spec")
@@ -40,24 +44,29 @@ func NewOathKeeperRuleCmd() cli.Command {
 				return errors.New("no output file")
 			}
 
+			skipTag := c.String("skip-tag")
+
 			return newOathKeeperRuleCmd(
 				mainFile,
 				outputFile,
+				skipTag,
 			).Run()
 		},
 	}
 }
 
-func newOathKeeperRuleCmd(spec string, outputFile string) *oathKeeperRuleCmd {
+func newOathKeeperRuleCmd(spec, outputFile, skipTag string) *oathKeeperRuleCmd {
 	return &oathKeeperRuleCmd{
 		spec:       spec,
 		outputFile: outputFile,
+		skipTag:    skipTag,
 	}
 }
 
 type oathKeeperRuleCmd struct {
 	spec       string
 	outputFile string
+	skipTag    string
 }
 
 func (c *oathKeeperRuleCmd) Run() error {
@@ -70,6 +79,9 @@ func (c *oathKeeperRuleCmd) Run() error {
 
 	for path, pathItem := range mainSpec.Paths.Map() {
 		for method, op := range pathItem.Operations() {
+			if c.skipTag != "" && containerTag(c.skipTag, op) {
+				continue
+			}
 			oathkeeperRules := newRules(mainSpec.Servers, method, path, op)
 			rules = append(rules, oathkeeperRules...)
 		}
@@ -89,6 +101,15 @@ func (c *oathKeeperRuleCmd) Run() error {
 
 	fmt.Printf("API definitions written to %s\n", c.outputFile)
 	return nil
+}
+
+func containerTag(tag string, op *openapi3.Operation) bool {
+	for _, t := range op.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }
 
 /*
