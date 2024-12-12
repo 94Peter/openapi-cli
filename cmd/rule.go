@@ -217,13 +217,13 @@ func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi
 				continue
 			}
 
-			format := param.Value.Schema.Value.Format
+			format := strings.ToLower(param.Value.Schema.Value.Format)
 
 			if replace, ok := formatReplaceMap[format]; ok {
 				myurl = strings.ReplaceAll(myurl, match[0], replace)
 				continue
 			}
-			myurl = strings.ReplaceAll(myurl, match[0], "<.*>")
+			myurl = strings.ReplaceAll(myurl, match[0], "<(?!.*/).*>")
 		}
 
 	}
@@ -235,8 +235,7 @@ func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi
 }
 
 var formatReplaceMap = map[string]string{
-	"objectId": "<[0-9a-fA-F]{24}>",
-	"ObjectId": "<[0-9a-fA-F]{24}>",
+	"objectid": "<[0-9a-fA-F]{24}>",
 }
 
 var typeReplaceMap = map[string]string{
