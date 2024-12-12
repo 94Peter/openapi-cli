@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"regexp"
 
@@ -133,12 +134,22 @@ func (a *apiDefinition) AddInputQueryString(query string) {
 var versionReplaceReg = regexp.MustCompile(`/v[0-9]+`)
 
 func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string, noRedirect bool) *apiDefinition {
-	host := []string{operation.ExternalDocs.URL}
+	parsedUrl, err := url.Parse(operation.ExternalDocs.URL)
+	if err != nil {
+		panic(err)
+	}
+	prepath := parsedUrl.Path
+	parsedUrl.Path = ""
+	fmt.Println(parsedUrl.String(), parsedUrl.Path, parsedUrl.Scheme, prepath)
+	host := []string{parsedUrl.String()}
 	var endpoint string
 	if replaceVersion != "" {
 		endpoint = versionReplaceReg.ReplaceAllString(path, "/"+replaceVersion)
 	} else {
 		endpoint = path
+	}
+	if prepath != "" {
+		path = prepath + path
 	}
 	apiDefinition := &apiDefinition{
 		Description: operation.Summary,
