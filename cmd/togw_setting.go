@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/pkg/errors"
@@ -132,6 +133,7 @@ func (a *apiDefinition) AddInputQueryString(query string) {
 }
 
 var versionReplaceReg = regexp.MustCompile(`/v[0-9]+`)
+var paramPathReg = regexp.MustCompile(`\{([^}]+)\}`)
 
 func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string, noRedirect bool) *apiDefinition {
 	parsedUrl, err := url.Parse(operation.ExternalDocs.URL)
@@ -142,6 +144,9 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation,
 	parsedUrl.Path = ""
 	host := []string{parsedUrl.String()}
 	var endpoint string
+	path = paramPathReg.ReplaceAllStringFunc(path, func(s string) string {
+		return "{" + strings.ToLower(s[1:len(s)-1]) + "}"
+	})
 	if replaceVersion != "" {
 		endpoint = versionReplaceReg.ReplaceAllString(path, "/"+replaceVersion)
 	} else {
