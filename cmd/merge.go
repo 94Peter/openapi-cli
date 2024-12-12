@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/pkg/errors"
@@ -29,8 +31,8 @@ func NewMergeCmd() cli.Command {
 				Usage: "輸出檔案路徑",
 			},
 			cli.StringFlag{
-				Name:  "version-replace",
-				Usage: "替換版本號",
+				Name:  "version-folder-index",
+				Usage: "目錄名稱中的版本號索引位置",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -62,26 +64,30 @@ func NewMergeCmd() cli.Command {
 				mainFile,
 				mergeFiles,
 				outputFile,
-				c.String("version-replace"),
+				c.String("version-folder-index"),
 			).Run()
 		},
 	}
 }
 
-func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, replaceVers string) *mergeCmd {
+func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versionFolderIndex string) *mergeCmd {
+	index, err := strconv.Atoi(versionFolderIndex)
+	if err != nil {
+		index = -1
+	}
 	return &mergeCmd{
-		mainFile:    mainFile,
-		mergeFiles:  mergeFiles,
-		outputFile:  outputFile,
-		replaceVers: replaceVers,
+		mainFile:           mainFile,
+		mergeFiles:         mergeFiles,
+		outputFile:         outputFile,
+		versionFolderIndex: index,
 	}
 }
 
 type mergeCmd struct {
-	mainFile    string
-	mergeFiles  []string
-	outputFile  string
-	replaceVers string
+	mainFile           string
+	mergeFiles         []string
+	outputFile         string
+	versionFolderIndex int
 }
 
 func (c *mergeCmd) Run() error {
@@ -89,7 +95,7 @@ func (c *mergeCmd) Run() error {
 	if err != nil {
 		return errors.Wrap(err, "load main spec fail")
 	}
-	tool := newMergeTool(mainSpec, c.replaceVers)
+	tool := newMergeTool(mainSpec, WithApiDogFolderToPath(c.versionFolderIndex))
 	for _, file := range c.mergeFiles {
 		spec2, err := openapi3.NewLoader().LoadFromFile(file)
 		if err != nil {
@@ -103,16 +109,51 @@ func (c *mergeCmd) Run() error {
 	return tool.OuputYaml(c.outputFile)
 }
 
-func newMergeTool(maindoc *openapi3.T, replaceVers string) *mergeTool {
-	return &mergeTool{
-		doc:            maindoc,
-		replaceVersion: replaceVers,
+type mergeToolOption func(*mergeTool)
+
+func WithApiDogFolderToPath(index int) mergeToolOption {
+	return func(mt *mergeTool) {
+		mt.ApiDogFolderToPath = &ApiDogFolderToPath{
+			index: index,
+		}
 	}
 }
 
+func newMergeTool(maindoc *openapi3.T, opts ...mergeToolOption) *mergeTool {
+	tool := &mergeTool{
+		doc: maindoc,
+	}
+	for _, opt := range opts {
+		opt(tool)
+	}
+	return tool
+}
+
+const apiDogFolderKey = "x-apidog-folder"
+
+type ApiDogFolderToPath struct {
+	index int
+}
+
+func (a *ApiDogFolderToPath) GetUrlWithVersion(url string, extensions map[string]any) string {
+	if a == nil || a.index < 0 {
+		return url
+	}
+	folderInfo, ok := extensions[apiDogFolderKey]
+	if !ok {
+		return url
+	}
+	folder := folderInfo.(string)
+	folderSlice := strings.Split(folder, "/")
+	if len(folderSlice) <= a.index {
+		return url
+	}
+	return fmt.Sprintf("%s/%s", url, folderSlice[a.index])
+}
+
 type mergeTool struct {
-	doc            *openapi3.T
-	replaceVersion string
+	doc *openapi3.T
+	*ApiDogFolderToPath
 }
 
 func (mt *mergeTool) OuputYaml(file string) error {
@@ -160,12 +201,8 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 				}
 				o.Security = requirements
 			}
-
-			if m.replaceVersion != "" {
-				o.Summary = o.Summary + fmt.Sprintf("(對應 %s %s)", method, k)
-				k = versionReplaceReg.ReplaceAllString(k, "/"+m.replaceVersion)
-			}
-			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: url}
+			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: m.GetUrlWithVersion(url, o.Extensions)}
+			o.Tags = []string{mergeDoc.Info.Title}
 			m.doc.AddOperation(k, method, o)
 		}
 
