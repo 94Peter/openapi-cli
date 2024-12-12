@@ -140,7 +140,6 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation,
 	}
 	prepath := parsedUrl.Path
 	parsedUrl.Path = ""
-	fmt.Println(parsedUrl.String(), parsedUrl.Path, parsedUrl.Scheme, prepath)
 	host := []string{parsedUrl.String()}
 	var endpoint string
 	if replaceVersion != "" {

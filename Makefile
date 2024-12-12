@@ -23,3 +23,13 @@ push-docker:
 install-cmd: build
 	sudo mv ./bin/$(NAME) /usr/local/bin/
 	$(NAME)
+
+
+test-merge:
+	go run ./container/main.go ms -mergeDir ./temp/group/ -main ./temp/main_spec.yml -output ./merge3.yaml -version-folder-index 1
+
+test-togw:
+	go run ./container/main.go togs -spec ./merge3.yaml -output ./setting.json
+
+test-rule:
+	go run ./container/main.go tar -spec ./merge3.yaml -output ./rules.json

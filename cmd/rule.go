@@ -97,7 +97,10 @@ func (c *oathKeeperRuleCmd) Run() error {
 	// Encode the API definitions to JSON and write to the file
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	fmt.Println(encoder.Encode(rules))
+	err = encoder.Encode(rules)
+	if err != nil {
+		log.Fatalf("Error encoding API definitions: %v", err)
+	}
 
 	fmt.Printf("API definitions written to %s\n", c.outputFile)
 	return nil
