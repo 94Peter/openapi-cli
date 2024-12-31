@@ -34,6 +34,10 @@ func NewMergeCmd() cli.Command {
 				Name:  "version-folder-index",
 				Usage: "目錄名稱中的版本號索引位置",
 			},
+			cli.StringFlag{
+				Name:  "api-prefix-path",
+				Usage: "api路徑前綴",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			mergeDir := c.String("mergeDir")
@@ -60,17 +64,20 @@ func NewMergeCmd() cli.Command {
 			if outputFile == "" {
 				return errors.New("no output file")
 			}
+			prefixPath := c.String("api-prefix-path")
+
 			return newMergeCmd(
 				mainFile,
 				mergeFiles,
 				outputFile,
 				c.String("version-folder-index"),
+				prefixPath,
 			).Run()
 		},
 	}
 }
 
-func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versionFolderIndex string) *mergeCmd {
+func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versionFolderIndex string, prefixPath string) *mergeCmd {
 	index, err := strconv.Atoi(versionFolderIndex)
 	if err != nil {
 		index = -1
@@ -80,6 +87,7 @@ func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versio
 		mergeFiles:         mergeFiles,
 		outputFile:         outputFile,
 		versionFolderIndex: index,
+		prefixPath:         prefixPath,
 	}
 }
 
@@ -88,6 +96,7 @@ type mergeCmd struct {
 	mergeFiles         []string
 	outputFile         string
 	versionFolderIndex int
+	prefixPath         string
 }
 
 func (c *mergeCmd) Run() error {
@@ -95,7 +104,9 @@ func (c *mergeCmd) Run() error {
 	if err != nil {
 		return errors.Wrap(err, "load main spec fail")
 	}
-	tool := newMergeTool(mainSpec, WithApiDogFolderToPath(c.versionFolderIndex))
+	tool := newMergeTool(mainSpec,
+		WithApiDogFolderToPath(c.versionFolderIndex),
+		WithApiPrefixPath(c.prefixPath))
 	for _, file := range c.mergeFiles {
 		spec2, err := openapi3.NewLoader().LoadFromFile(file)
 		if err != nil {
@@ -119,6 +130,12 @@ func WithApiDogFolderToPath(index int) mergeToolOption {
 	}
 }
 
+func WithApiPrefixPath(prefixPath string) mergeToolOption {
+	return func(mt *mergeTool) {
+		mt.prefixPath = prefixPath
+	}
+}
+
 func newMergeTool(maindoc *openapi3.T, opts ...mergeToolOption) *mergeTool {
 	tool := &mergeTool{
 		doc: maindoc,
@@ -132,7 +149,8 @@ func newMergeTool(maindoc *openapi3.T, opts ...mergeToolOption) *mergeTool {
 const apiDogFolderKey = "x-apidog-folder"
 
 type ApiDogFolderToPath struct {
-	index int
+	index      int
+	prefixPath string
 }
 
 func (a *ApiDogFolderToPath) GetUrlWithVersion(url string, extensions map[string]any) string {
@@ -149,6 +167,13 @@ func (a *ApiDogFolderToPath) GetUrlWithVersion(url string, extensions map[string
 		return url
 	}
 	return fmt.Sprintf("%s/%s", url, folderSlice[a.index])
+}
+
+func (a *ApiDogFolderToPath) GetPath(path string) string {
+	if a.prefixPath == "" {
+		return path
+	}
+	return a.prefixPath + path
 }
 
 type mergeTool struct {
@@ -203,7 +228,8 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 			}
 			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: m.GetUrlWithVersion(url, o.Extensions)}
 			o.Tags = []string{mergeDoc.Info.Title}
-			m.doc.AddOperation(k, method, o)
+			fmt.Println(m.GetPath(k))
+			m.doc.AddOperation(m.GetPath(k), method, o)
 		}
 
 		if mergeDoc.Components == nil {
