@@ -34,7 +34,11 @@ func NewToGwSettingCmd() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "no-redirect-tag",
-				Usage: "替換版本號",
+				Usage: "設定不自動轉url",
+			},
+			cli.StringFlag{
+				Name:  "remove-api-prefix-path",
+				Usage: "移除api路徑前綴",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -49,30 +53,35 @@ func NewToGwSettingCmd() cli.Command {
 			noRedirectTag := c.String("no-redirect-tag")
 
 			versionReplace := c.String("version-replace")
+
+			removePrefixPath := c.String("remove-api-prefix-path")
 			return newToGwSettingCmd(
 				mainFile,
 				outputFile,
 				versionReplace,
 				noRedirectTag,
+				removePrefixPath,
 			).Run()
 		},
 	}
 }
 
-func newToGwSettingCmd(spec string, outputFile string, versionreplace string, noRedirectTag string) *toGwSettingCmd {
+func newToGwSettingCmd(spec string, outputFile string, versionreplace string, noRedirectTag string, removePrefixPath string) *toGwSettingCmd {
 	return &toGwSettingCmd{
-		spec:           spec,
-		outputFile:     outputFile,
-		versionReplace: versionreplace,
-		noRedirectTag:  noRedirectTag,
+		spec:             spec,
+		outputFile:       outputFile,
+		versionReplace:   versionreplace,
+		noRedirectTag:    noRedirectTag,
+		removePrefixPath: removePrefixPath,
 	}
 }
 
 type toGwSettingCmd struct {
-	spec           string
-	outputFile     string
-	versionReplace string
-	noRedirectTag  string
+	spec             string
+	outputFile       string
+	versionReplace   string
+	noRedirectTag    string
+	removePrefixPath string
 }
 
 func (c *toGwSettingCmd) Run() error {
@@ -95,7 +104,7 @@ func (c *toGwSettingCmd) Run() error {
 				}
 			}
 			apiDefinitions = append(apiDefinitions,
-				newApiDefinition(method, path, op, c.versionReplace, noRedirect))
+				newApiDefinition(method, path, op, c.versionReplace, noRedirect, c.removePrefixPath))
 		}
 	}
 	// Create the output JSON file
@@ -135,7 +144,7 @@ func (a *apiDefinition) AddInputQueryString(query string) {
 var versionReplaceReg = regexp.MustCompile(`/v[0-9]+`)
 var paramPathReg = regexp.MustCompile(`\{([^}]+)\}`)
 
-func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string, noRedirect bool) *apiDefinition {
+func newApiDefinition(method string, path string, operation *openapi3.Operation, replaceVersion string, noRedirect bool, removePrefixPath string) *apiDefinition {
 	parsedUrl, err := url.Parse(operation.ExternalDocs.URL)
 	if err != nil {
 		panic(err)
@@ -151,6 +160,9 @@ func newApiDefinition(method string, path string, operation *openapi3.Operation,
 		endpoint = versionReplaceReg.ReplaceAllString(path, "/"+replaceVersion)
 	} else {
 		endpoint = path
+	}
+	if removePrefixPath != "" {
+		path = strings.TrimPrefix(path, removePrefixPath)
 	}
 	if prepath != "" {
 		path = prepath + path
