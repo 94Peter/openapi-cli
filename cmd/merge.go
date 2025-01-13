@@ -219,6 +219,9 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 	// merge all mergeDoc to mainDoc
 	for k, v := range mergeDoc.Paths.Map() {
 		for method, o := range v.Operations() {
+			if o.Deprecated {
+				continue
+			}
 			if o.Security != nil && len(*o.Security) != 0 {
 				requirements := openapi3.NewSecurityRequirements()
 				for k := range m.doc.Components.SecuritySchemes {
@@ -228,7 +231,6 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 			}
 			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: m.GetUrlWithVersion(url, o.Extensions)}
 			o.Tags = []string{mergeDoc.Info.Title}
-			fmt.Println(m.GetPath(k))
 			m.doc.AddOperation(m.GetPath(k), method, o)
 		}
 
