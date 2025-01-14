@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -226,6 +227,12 @@ func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi
 				myurl = strings.ReplaceAll(myurl, match[0], replace)
 				continue
 			}
+
+			if result, ok := joinEnum(param.Value.Schema.Value.Type, param.Value.Schema.Value.Enum); ok {
+				myurl = strings.ReplaceAll(myurl, match[0], result)
+				continue
+			}
+
 			myurl = strings.ReplaceAll(myurl, match[0], "<(?!.*/).*>")
 		}
 
@@ -235,6 +242,26 @@ func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi
 		Methods: []string{method},
 		URL:     fmt.Sprintf(matchUrlTpl, strings.Join(hostMatch, "|"), myurl),
 	}
+}
+
+func joinEnum(typ *openapi3.Types, enum []any) (string, bool) {
+	if len(enum) == 0 {
+		return "", false
+	}
+	if typ.Includes("string") {
+		var buffer bytes.Buffer
+		buffer.WriteString("<")
+		for i, v := range enum {
+			if i > 0 {
+				buffer.WriteString("|")
+			}
+			buffer.WriteString(v.(string))
+		}
+		buffer.WriteString(">")
+		return buffer.String(), true
+	}
+
+	return "", false
 }
 
 var formatReplaceMap = map[string]string{
