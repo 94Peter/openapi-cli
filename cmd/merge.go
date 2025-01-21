@@ -38,6 +38,10 @@ func NewMergeCmd() cli.Command {
 				Name:  "api-prefix-path",
 				Usage: "api路徑前綴",
 			},
+			cli.BoolFlag{
+				Name:  "keep-tags",
+				Usage: "留下被合併的標籤",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			mergeDir := c.String("mergeDir")
@@ -65,19 +69,20 @@ func NewMergeCmd() cli.Command {
 				return errors.New("no output file")
 			}
 			prefixPath := c.String("api-prefix-path")
-
+			keepTags := c.Bool("keep-tags")
 			return newMergeCmd(
 				mainFile,
 				mergeFiles,
 				outputFile,
 				c.String("version-folder-index"),
 				prefixPath,
+				keepTags,
 			).Run()
 		},
 	}
 }
 
-func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versionFolderIndex string, prefixPath string) *mergeCmd {
+func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versionFolderIndex string, prefixPath string, keepTags bool) *mergeCmd {
 	index, err := strconv.Atoi(versionFolderIndex)
 	if err != nil {
 		index = -1
@@ -88,6 +93,7 @@ func newMergeCmd(mainFile string, mergeFiles []string, outputFile string, versio
 		outputFile:         outputFile,
 		versionFolderIndex: index,
 		prefixPath:         prefixPath,
+		keepTags:           keepTags,
 	}
 }
 
@@ -97,6 +103,7 @@ type mergeCmd struct {
 	outputFile         string
 	versionFolderIndex int
 	prefixPath         string
+	keepTags           bool
 }
 
 func (c *mergeCmd) Run() error {
@@ -106,7 +113,9 @@ func (c *mergeCmd) Run() error {
 	}
 	tool := newMergeTool(mainSpec,
 		WithApiDogFolderToPath(c.versionFolderIndex),
-		WithApiPrefixPath(c.prefixPath))
+		WithApiPrefixPath(c.prefixPath),
+		WithKeepTags(c.keepTags),
+	)
 	for _, file := range c.mergeFiles {
 		spec2, err := openapi3.NewLoader().LoadFromFile(file)
 		if err != nil {
@@ -133,6 +142,12 @@ func WithApiDogFolderToPath(index int) mergeToolOption {
 func WithApiPrefixPath(prefixPath string) mergeToolOption {
 	return func(mt *mergeTool) {
 		mt.prefixPath = prefixPath
+	}
+}
+
+func WithKeepTags(keepTags bool) mergeToolOption {
+	return func(mt *mergeTool) {
+		mt.keepTags = keepTags
 	}
 }
 
@@ -179,6 +194,7 @@ func (a *ApiDogFolderToPath) GetPath(path string) string {
 type mergeTool struct {
 	doc *openapi3.T
 	*ApiDogFolderToPath
+	keepTags bool
 }
 
 func (mt *mergeTool) OuputYaml(file string) error {
@@ -230,7 +246,13 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 				o.Security = requirements
 			}
 			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: m.GetUrlWithVersion(url, o.Extensions)}
-			o.Tags = []string{mergeDoc.Info.Title}
+
+			if m.keepTags {
+				o.Tags = append(o.Tags, mergeDoc.Info.Title)
+				o.Tags = removeDuplicateStr(o.Tags)
+			} else {
+				o.Tags = []string{mergeDoc.Info.Title}
+			}
 			m.doc.AddOperation(m.GetPath(k), method, o)
 		}
 
@@ -251,4 +273,16 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 		}
 	}
 	return nil
+}
+
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
 }
