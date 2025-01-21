@@ -176,6 +176,8 @@ func newRules(servers openapi3.Servers, method string, path string, op *openapi3
 		}
 	} else {
 		newRule.Authenticators = []rule.Handler{
+			{Handler: "cookie_session", Config: []byte(`{}`)},
+			{Handler: "bearer_token", Config: []byte(`{}`)},
 			{Handler: "anonymous", Config: []byte(`{"subject": "guest"}`)},
 		}
 	}
