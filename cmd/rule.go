@@ -235,7 +235,7 @@ func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi
 				continue
 			}
 
-			myurl = strings.ReplaceAll(myurl, match[0], "<(?!.*/).*>")
+			myurl = strings.ReplaceAll(myurl, match[0], "<[^/]+>")
 		}
 
 	}
