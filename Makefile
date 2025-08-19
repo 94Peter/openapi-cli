@@ -26,10 +26,16 @@ install-cmd: build
 
 
 test-merge:
-	go run ./container/main.go ms -mergeDir ./temp/group/ -main ./temp/main_spec.yml -output ./merge3.yaml -version-folder-index 1
+	go run ./container/main.go ms -mergeDir ./temp/group/ -main ./temp/main_spec.yml -output ./merge3.yaml -version-folder-index 1 -keep-tags
+
+test-merge-with-subpath:
+	go run ./container/main.go ms -mergeDir ./temp/group/ -main ./temp/main_spec.yml -output ./merge4.yaml -version-folder-index 1 -api-prefix-path /web
 
 test-togw:
 	go run ./container/main.go togs -spec ./merge3.yaml -output ./setting.json
 
+test-togw-with-remove-prefix-path:
+	go run ./container/main.go togs -spec ./merge4.yaml -output ./setting.json -remove-api-prefix-path /web
+
 test-rule:
-	go run ./container/main.go tar -spec ./merge3.yaml -output ./rules.json
+	go run ./container/main.go tar -spec ./merge3.yaml -output ./rules.yaml

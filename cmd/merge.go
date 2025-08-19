@@ -198,23 +198,8 @@ type mergeTool struct {
 }
 
 func (mt *mergeTool) OuputYaml(file string) error {
-	type doc struct {
-		Openapi    string               `yaml:"openapi"`
-		Info       *openapi3.Info       `yaml:"info"`
-		Servers    openapi3.Servers     `yaml:"servers,omitempty"`
-		Tags       []*openapi3.Tag      `yaml:"tags,omitempty"`
-		Paths      *openapi3.Paths      `yaml:"paths"`
-		Components *openapi3.Components `yaml:"components,omitempty"`
-	}
-	mydoc := doc{
-		Openapi:    mt.doc.OpenAPI,
-		Info:       mt.doc.Info,
-		Servers:    mt.doc.Servers,
-		Tags:       mt.doc.Tags,
-		Paths:      mt.doc.Paths,
-		Components: mt.doc.Components,
-	}
-	data, err := yaml.Marshal(mydoc)
+	// convert to yaml
+	data, err := yaml.Marshal(mt.doc)
 	if err != nil {
 		return err
 	}
@@ -246,7 +231,6 @@ func (m *mergeTool) Merge(mergeDoc *openapi3.T) error {
 				o.Security = requirements
 			}
 			o.ExternalDocs = &openapi3.ExternalDocs{Description: desc, URL: m.GetUrlWithVersion(url, o.Extensions)}
-
 			if m.keepTags {
 				o.Tags = append(o.Tags, mergeDoc.Info.Title)
 				o.Tags = removeDuplicateStr(o.Tags)

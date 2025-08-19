@@ -103,6 +103,11 @@ func (c *toGwSettingCmd) Run() error {
 					}
 				}
 			}
+			if redirect, ok := op.Extensions["x-krakend-redirect"]; ok {
+				if redirect == false {
+					noRedirect = true
+				}
+			}
 			apiDefinitions = append(apiDefinitions,
 				newApiDefinition(method, path, op, c.versionReplace, noRedirect, c.removePrefixPath))
 		}

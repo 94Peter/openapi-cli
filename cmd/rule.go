@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/itchyny/json2yaml"
 	"github.com/ory/oathkeeper/rule"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -96,11 +97,16 @@ func (c *oathKeeperRuleCmd) Run() error {
 	defer file.Close()
 
 	// Encode the API definitions to JSON and write to the file
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+
 	err = encoder.Encode(rules)
 	if err != nil {
 		log.Fatalf("Error encoding API definitions: %v", err)
+	}
+
+	if err := json2yaml.Convert(file, &buffer); err != nil {
+		log.Fatalln(err)
 	}
 
 	fmt.Printf("API definitions written to %s\n", c.outputFile)
@@ -181,6 +187,12 @@ func newRules(servers openapi3.Servers, method string, path string, op *openapi3
 			{Handler: "anonymous", Config: []byte(`{"subject": "guest"}`)},
 		}
 	}
+	if authorizerConfig, ok := op.Extensions["x-authorizer-config"]; ok {
+		newRule.Authorizer.Handler = "remote_json"
+		config := map[string]any{"payload": authorizerConfig}
+		configBytes, _ := json.Marshal(config)
+		newRule.Authorizer.Config = configBytes
+	}
 	return []*rule.Rule{newRule}
 }
 
@@ -239,7 +251,6 @@ func newMatch(servers openapi3.Servers, method string, myurl string, op *openapi
 		}
 
 	}
-
 	return &rule.Match{
 		Methods: []string{method},
 		URL:     fmt.Sprintf(matchUrlTpl, strings.Join(hostMatch, "|"), myurl),
